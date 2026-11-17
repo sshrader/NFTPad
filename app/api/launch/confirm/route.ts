@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getConnection, mintExists } from "@/lib/solana";
 import { finalizeCoin } from "@/lib/finalize";
+import { verifyPool } from "@/lib/meteora";
 
 export const runtime = "nodejs";
 
@@ -30,10 +31,14 @@ export async function POST(req: Request) {
     if (v.confirmationStatus !== "confirmed" && v.confirmationStatus !== "finalized")
       return NextResponse.json({ error: "Transaction not confirmed yet. Try again in a few seconds." }, { status: 409 });
 
-    // A random successful transaction must not be enough: the coin's mint has to exist on-chain.
-    const mintRow = await pool.query("SELECT mint FROM coins WHERE id = $1", [coinId]);
-    if (!mintRow.rows[0]?.mint || !(await mintExists(mintRow.rows[0].mint)))
+    // A random successful transaction must not be enough: the coin's mint must have a pool made
+    // from OUR config by the wallet that launched it.
+    const row = await pool.query("SELECT mint, creator FROM coins WHERE id = $1", [coinId]);
+    const { mint, creator } = row.rows[0] ?? {};
+    if (!mint || !(await mintExists(mint)))
       return NextResponse.json({ error: "Token mint not found on-chain yet" }, { status: 409 });
+    const check = await verifyPool(mint, creator);
+    if ("error" in check) return NextResponse.json({ error: check.error }, { status: 400 });
 
     await pool.query("UPDATE coins SET pending_tx = $1 WHERE id = $2", [signature, coinId]);
     await finalizeCoin(coinId);

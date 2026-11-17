@@ -18,9 +18,22 @@ Launch a coin, upload holder art, and let anyone who holds the coin claim an NFT
 | `LAUNCH_MODE` | What the creator does | Use for |
 |---|---|---|
 | `attach` (default) | Pastes the mint address of an existing SPL token | Testing the claim flow now. **Do not use on mainnet**: anyone could attach someone else's token. |
-| `meteora` | Server builds a Meteora DBC pool-creation transaction; the creator's wallet signs and sends it | Real launches. **Unverified**: see `lib/meteora.ts`. Needs `PARTNER_CONFIG_ADDRESS`. |
+| `meteora` | Server builds a Meteora Dynamic Bonding Curve pool-creation transaction; the creator's wallet signs and sends it. The coin is created on a bonding curve. | Real launches. Needs `PARTNER_CONFIG_ADDRESS` (see below). **Untested in this app yet**: the Meteora calls are ported from the working devnet setup in `sshrader/launchpad`. |
 
 Keep `NEXT_PUBLIC_LAUNCH_MODE` equal to `LAUNCH_MODE`.
+
+## Meteora bonding curve setup (`LAUNCH_MODE=meteora`)
+
+1. **Create the config once** (run locally with `MINT_AUTHORITY_SECRET` and `RPC_URL` in `.env`, wallet funded with ≥0.05 devnet SOL):
+   ```bash
+   npm run dbc-config -- --check   # prints the curve/fee settings, sends nothing
+   npm run dbc-config              # creates the config on chain, prints PARTNER_CONFIG_ADDRESS
+   ```
+   Settings (`DBC_INITIAL_MC`, `DBC_MIGRATION_MC`, `DBC_FEE_BPS`, `DBC_CREATOR_FEE_PCT`, `DBC_FEE_CLAIMER`) are in `.env.example`. **They are permanent once created.**
+2. In Railway set `PARTNER_CONFIG_ADDRESS=<printed value>`, `LAUNCH_MODE=meteora` and `NEXT_PUBLIC_LAUNCH_MODE=meteora`, then redeploy.
+3. Each launch is one transaction (created by `lib/meteora.ts`, signed in the creator's wallet). Before a coin goes live, `/api/launch/confirm` checks on chain that the mint has a pool made from **your config** by the **launching wallet**.
+4. Holder NFT claims work the same: the coin's mint is the token holders must own. Note that on a bonding curve, holders buy through the pool, so you will want a trading UI (the Buy/Sell box in `sshrader/launchpad`, `src/components/TradeBox.tsx` and `src/lib/dbc.ts`, is a good starting point).
+5. Claim your fees: `npm run dbc-fees -- --check` then `npm run dbc-fees` (must be run with the fee claimer wallet).
 
 ## Local setup
 
@@ -60,5 +73,6 @@ npm run dev
 - **Costs are paid by the server wallet** (collection + each NFT). A launch cap per creator wallet exists (3 per 24h), but add IP rate limiting and/or a launch fee.
 - **Images are stored in Postgres** and served by this app. Fine for testing; move to Arweave/IPFS for production so NFT art does not depend on your server.
 - **No content moderation or takedown tooling yet.** Users upload images, so add reporting and removal before opening it up.
-- **Meteora config creation** (the partner config and curve parameters) is not scripted yet.
+- **No trading UI yet.** In `meteora` mode coins are created on a curve, but buying and selling happens elsewhere (or you add the Buy/Sell box from `sshrader/launchpad`).
+- **No anti-sniper fee decay and no dev-buy at launch** in the curve config: it uses a flat fee, like the launchpad repo. Both are possible later but need devnet testing.
 - **Legal**: don't market holder NFTs as an investment. Get advice for your jurisdiction before a public launch.
