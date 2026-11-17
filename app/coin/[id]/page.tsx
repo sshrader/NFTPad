@@ -30,16 +30,29 @@ export default async function CoinPage({ params }: { params: { id: string } }) {
           <p className="muted" style={{ marginBottom: 0 }}>Holder NFT</p>
         </div>
         <div>
-          <h1 style={{ marginTop: 0 }}>
-            {coin.name} <span className="muted">({coin.symbol})</span>
+          <h1>
+            {coin.name} <span className="pill">{coin.symbol}</span>
           </h1>
-          {coin.description && <p>{coin.description}</p>}
-          <p className="muted">
-            Hold at least <b>{Number(coin.min_balance)} {coin.symbol}</b> to claim ·{" "}
-            {coin.claimed}
-            {coin.max_claims ? ` / ${coin.max_claims}` : ""} claimed
-            {coin.claim_ends_at ? ` · ${ended ? "ended" : "ends"} ${new Date(coin.claim_ends_at).toUTCString()}` : ""}
-          </p>
+          {coin.description && <p style={{ lineHeight: 1.6 }}>{coin.description}</p>}
+          <div className="stat-row">
+            <div className="stat">
+              <div className="k">To claim, hold</div>
+              <div className="v">{Number(coin.min_balance)} {coin.symbol}</div>
+            </div>
+            <div className="stat">
+              <div className="k">Claimed</div>
+              <div className="v">
+                {coin.claimed}
+                {coin.max_claims ? ` / ${coin.max_claims}` : ""}
+              </div>
+            </div>
+            {coin.claim_ends_at && (
+              <div className="stat">
+                <div className="k">{ended ? "Ended" : "Ends"}</div>
+                <div className="v">{new Date(coin.claim_ends_at).toUTCString().replace(" GMT", " UTC")}</div>
+              </div>
+            )}
+          </div>
           <p className="muted">
             Token: <a href={`https://solscan.io/token/${coin.mint}${cluster}`} target="_blank" rel="noreferrer"><code>{coin.mint}</code></a>
           </p>
